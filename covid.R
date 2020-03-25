@@ -13,6 +13,8 @@ kol <- c("darkgreen", "red", "orange", "blue", "black", "green", "darkviolet", "
 
 # directories declaration
 COVID <- "/Users/paolo/Desktop/covid"
+
+# need local fectch of John Hopkins and Italian Civil Protection data
 DIR_ITA <- file.path(COVID, "COVID-19/dati-json")
 DIR_WORLD <- file.path(COVID, "COVID-WORLD/csse_covid_19_data/csse_covid_19_time_series")
 
@@ -22,6 +24,7 @@ FIGDIR2 <- file.path(COVID, "world_prediction")
 FIGDIR3 <- file.path(COVID, "italian_regions")
 dir.create(FIGDIR3, FIGDIR, FIGDIR2)
 
+# for updates
 now <- Sys.time()
 
 # setup
