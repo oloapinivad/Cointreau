@@ -18,10 +18,10 @@ git pull
 /usr/bin/Rscript $DIR/Cointreau/covid.R
 
 # create figure names and copy to the webserver
-outname="covid_status_$(date +%Y-%m-%d).svg"
-today="covid_status_today.svg"
+filename="covid-status-$(date +%Y-%m-%d).svg"
+today="covid-status-today.svg"
 echo $outname
 
-cp $FIGDIR/$today $WWWDIR/$outname
-cp $FIGDIR/$today $WWWDIR
+cp $FIGDIR/$filename $WWWDIR
+ln -sf $WWWDIR/$filename $WWWDIR/$today
 cp $DIR/Cointreau/index.html $WWWDIR
