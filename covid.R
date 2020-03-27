@@ -9,7 +9,7 @@ library("nlstools")
 library("svglite")
 
 # colors
-kol <- c("darkgreen", "red", "orange", "blue", "black", "green", "darkviolet", "pink", "aquamarine3")
+kol <- c("darkgreen", "red", "orange", "blue", "brown","black", "green", "darkviolet", "pink", "aquamarine3")
 
 # directories declaration
 COVID <- "/Users/paolo/Desktop/covid"
@@ -28,11 +28,14 @@ dir.create(FIGDIR3, FIGDIR, FIGDIR2)
 now <- Sys.time()
 
 # setup
-countries <- c("Italy", "Spain", "China", "France", "United Kingdom", "Iran", "Korea, South", "Japan", "US")
+countries <- c("Italy", "Spain", "China", "France", "United Kingdom", "Germany", "Iran", "Korea, South", "Netherlands", "US")
 regions <- c("Lombardia", "Veneto", "Emilia Romagna", "Piemonte", "Marche", "Liguria")
 
 # days of prediction since the first data
 end <- 150
+
+# graphical parameter
+bsize = 17
 
 # gompertz fitter
 predict.covid <- function(calendar, death, name = "Italy", total_length = 150, min_death = 5, verbose = F) {
@@ -147,25 +150,23 @@ df$name <- factor(df$name, levels = countries)
 world_plot <- list()
 theplot[[7]] <- world_plot[[1]] <- ggplot(df,  aes(x = days, y = lagged, col = name)) +
   geom_point() + geom_line() +
-  labs(title = "World COVID-19 Deaths when exceeding 100 counts", x = "# days", y = "# of deaths") +
-  labs(col = "Countries") +
-  theme_light(base_size = 15) +
+  labs(title = "World COVID-19 Deaths when exceeding 100 counts", x = "# days", y = "# of deaths since 100 counts") +
+  theme_light(base_size = bsize) +
   scale_color_manual(values = kol) +
   coord_cartesian(xlim = c(0, 60), ylim = c(0,10000)) +
   theme(axis.text.x=element_text(angle=60, hjust=1), legend.position = c(.01, 0.99),
     legend.justification = c("left", "top"), legend.box.just = "right",
-    legend.background = element_rect(fill = "transparent"))
+    legend.background = element_rect(fill = "transparent"), legend.title = element_blank())
 
 theplot[[8]] <- world_plot[[2]] <- ggplot(df,  aes(x = days, y = c(0,diff(lagged)), col = name)) +
   geom_point() + geom_line() +
-  labs(title = "World COVID-19 Daily Deaths when exceeding 100 counts", x = "# days", y = "# of deaths") +
-  labs(col = "Countries") +
-  theme_light(base_size = 15) +
+  labs(title = "World COVID-19 Daily Deaths when exceeding 100 counts", x = "# days since 100 counts", y = "# of deaths") +
+  theme_light(base_size = bsize) +
   scale_color_manual(values = kol) +
   coord_cartesian(xlim = c(0, 60), ylim = c(0,1000)) +
   theme(axis.text.x=element_text(angle=60, hjust=1), legend.position = c(.01, 0.99),
     legend.justification = c("left", "top"), legend.box.just = "right",
-    legend.background = element_rect(fill = "transparent"))
+    legend.background = element_rect(fill = "transparent"), legend.title = element_blank())
 
 ml <- arrangeGrob(grobs = world_plot, ncol = 1, nrow = 2, plot = F)
 ggsave(
@@ -187,13 +188,12 @@ world_daily <- list()
 theplot[[5]] <- world_daily[[1]] <- ggplot(df) +    
   geom_point(mapping = aes(x = calendar, y = death, col = name)) +
   geom_line(mapping = aes(x = calendar, y = predict, col = name)) +
-  labs(title = paste0("World Estimated COVID-19 deaths at ", dates[length(dates)]), x = "# days", y = "# of deaths") +
-  labs(col = "") +
-  theme_light(base_size = 15) +
+  labs(title = paste0("World Estimated COVID-19 deaths at ", dates[length(dates)]), x = "", y = "# of deaths") +
+  theme_light(base_size = bsize) +
   scale_x_date(date_breaks = "2 week", date_labels =  "%d %b") + 
   theme(axis.text.x=element_text(angle=60, hjust=1), legend.position = c(.01, 0.99),
     legend.justification = c("left", "top"), legend.box.just = "right",
-    legend.background = element_rect(fill = "transparent")) +
+    legend.background = element_rect(fill = "transparent"), legend.title = element_blank()) +
   scale_color_manual(values = kol, labels = legend_text) +
   #annotate("text", x=as.Date(calendar[50]), y = seq(20000, by= -1000, length.out=length(countries)), label = paste0(countries, ": ", round(forecast[,2]), "+-", round(forecast[,3]))) +
   coord_cartesian(ylim = c(0, 20000))
@@ -201,15 +201,13 @@ theplot[[5]] <- world_daily[[1]] <- ggplot(df) +
 theplot[[6]] <- world_daily[[2]] <- ggplot(df) +
   geom_point(df, mapping = aes(x = calendar, y = c(0,diff(death)), col = name)) +
   geom_line(df, mapping = aes(x = calendar, y = c(0,diff(predict)), col = name)) +
-  labs(title = paste0("World Estimated daily COVID-19 deaths at ", dates[length(dates)]), x = "# days", y = "# of deaths") +
-  labs(col = "") +
-  theme_light(base_size = 15) +
+  labs(title = paste0("World Estimated daily COVID-19 deaths at ", dates[length(dates)]), x = "", y = "# of deaths") +
+  theme_light(base_size = bsize) +
   scale_x_date(date_breaks = "2 week", date_labels =  "%d %b") +      
   theme(axis.text.x=element_text(angle=60, hjust=1), legend.position = c(.01, 0.99),
     legend.justification = c("left", "top"), legend.box.just = "right",
-    legend.background = element_rect(fill = "transparent")) +
+    legend.background = element_rect(fill = "transparent"), legend.title = element_blank()) +
   scale_color_manual(values = kol) +
-  annotate("text", x = world_plot_calendar[120], y = 900, label = paste0("Last Updated: ", now)) +
   coord_cartesian(ylim = c(0, 1000))
 
 ml <- arrangeGrob(grobs = world_daily, ncol = 1, nrow = 2, plot = F)
@@ -251,12 +249,11 @@ for (last_day in 20:length(full_death)) {
 theplot[[1]] <-  italy_daily[[1]] <- ggplot(df) +
   geom_point(mapping = aes(x = calendar, y = death, col = name)) +
   geom_line(mapping = aes(x = calendar, y = predict, col = name)) +
-  labs(title = paste0("Italy Estimated COVID-19 deaths at ", full_calendar[last_day]), x = "# days", y = "# of deaths") +
+  labs(title = paste0("Italy Estimated COVID-19 deaths at ", full_calendar[last_day]), x = "", y = "# of deaths") +
   geom_ribbon(aes(x = calendar, y = predict, ymin = lower, ymax = upper, fill = name), alpha = .2, size = 0.1)  +
-  labs(col = "") +
-  theme_light(base_size = 15) +
+  theme_light(base_size = bsize) +
   scale_x_date(date_breaks = "2 week", date_labels =  "%d %b") +
-  theme(axis.text.x=element_text(angle=60, hjust=1), legend.position = "none") + 
+  theme(axis.text.x=element_text(angle=60, hjust=1), legend.position = "none", legend.title = element_blank()) + 
   scale_color_manual(values = kol, labels = legend_text) +
   annotate("text", x=plot_calendar[20], y = 47000, label = saturation_text) +
   annotate("text", x=plot_calendar[20], y = 44000, label = predict_text) +
@@ -266,15 +263,15 @@ theplot[[2]] <-  italy_daily[[2]] <- ggplot(df) +
   geom_point(df, mapping = aes(x = calendar, y = c(0,diff(death)), col = name)) +
   geom_line(df, mapping = aes(x = calendar, y = c(0,diff(predict)), col = name)) +
   geom_ribbon(aes(x = calendar, y = c(0,diff(predict)), ymin = c(0, diff(lower)), ymax = c(0,diff(upper)), fill = name), alpha = .2, size = 0.1)  +
-  labs(title = paste0("Italy Estimated daily COVID-19 deaths at ", full_calendar[last_day]), x = "# days", y = "# of deaths") +
-  labs(col = "Countries") +
-  theme_light(base_size = 15) +
+  labs(title = paste0("Italy Estimated daily COVID-19 deaths at ", full_calendar[last_day]), x = "", y = "# of deaths") +
+  theme_light(base_size = bsize) +
   scale_x_date(date_breaks = "2 week", date_labels =  "%d %b") +
-  theme(axis.text.x=element_text(angle=60, hjust=1), legend.position = "none") + 
+  theme(axis.text.x=element_text(angle=60, hjust=1), legend.position = "none", legend.title = element_blank()) + 
   scale_color_manual(values = kol) +
   annotate("text", x=plot_calendar[20], y = 1400, label = maxdaily_text) +
   annotate("text", x=plot_calendar[20], y = 1300, label = daysofmax_text) +
   annotate("text", x=plot_calendar[20], y = 1200, label = delta_text) +
+  annotate("text", x = plot_calendar[120], y = 1000, label = paste0("Last Updated: ", now)) +
   coord_cartesian(ylim = c(0, 1500))
 
   ml <- arrangeGrob(grobs = italy_daily, ncol = 1, nrow = 2, plot = F)
@@ -367,13 +364,12 @@ theplot[[3]] <- region_daily[[1]] <- ggplot(df) +
   geom_line(mapping = aes(x = calendar, y = predict, col = name)) +
   #geom_ribbon(aes(x = calendar, y = predict, ymin = lower, ymax = upper, fill = name), alpha = .2, size = 0.1)  + 
   scale_fill_manual(values = kol, guide = "none") +
-  labs(title = paste0("Italian Regional Estimated COVID-19 deaths at ", dates[length(dates)]), x = "# days", y = "# of deaths") +
-  labs(col = "") +
-  theme_light(base_size = 15) +
+  labs(title = paste0("Italian Regional Estimated COVID-19 deaths at ", calendar_regions[length(calendar_regions)]), x = "", y = "# of deaths") +
+  theme_light(base_size = bsize) +
   scale_x_date(date_breaks = "2 week", date_labels =  "%d %b") +
   theme(axis.text.x=element_text(angle=60, hjust=1), legend.position = c(.01, 0.99),
     legend.justification = c("left", "top"), legend.box.just = "right",
-    legend.background = element_rect(fill = "transparent")) +
+    legend.background = element_rect(fill = "transparent"), legend.title = element_blank()) +
   scale_color_manual(values = kol, labels = legend_text) +
   #annotate("text", x=as.Date(calendar[50]), y = seq(20000, by= -1000, length.out=length(countries)), label = paste0(countries, ": ", round(forecast[,2]), "+-", round(forecast[,3]))) +
   coord_cartesian(ylim = c(0, 15000))
@@ -383,13 +379,12 @@ theplot[[4]] <- region_daily[[2]] <- ggplot(df) +
   geom_line(df, mapping = aes(x = calendar, y = c(0,diff(predict)), col = name)) +
   #geom_ribbon(aes(x = calendar, y = c(0,diff(predict)), ymin = c(0, diff(lower)), ymax = c(0,diff(upper)), fill = name), alpha = .2, size = 0.1)  + 
   scale_fill_manual(values = kol, guide = "none") +
-  labs(title = paste0("Italian Regions Estimated daily COVID-19 deaths at ", dates[length(dates)]), x = "# days", y = "# of deaths") +
-  labs(col = "") +
-  theme_light(base_size = 15) +
+  labs(title = paste0("Italian Regions Estimated daily COVID-19 deaths at ", calendar_regions[length(calendar_regions)]), x = "", y = "# of deaths") +
+  theme_light(base_size = bsize) +
   scale_x_date(date_breaks = "2 week", date_labels =  "%d %b") +     
   theme(axis.text.x=element_text(angle=60, hjust=1), legend.position = c(.01, 0.99),
     legend.justification = c("left", "top"), legend.box.just = "right", 
-    legend.background = element_rect(fill = "transparent")) +
+    legend.background = element_rect(fill = "transparent"), legend.title = element_blank()) +
   scale_color_manual(values = kol) +
   #annotate("text", x = world_plot_calendar[120], y = 900, label = paste0("Last Updated: ", now)) +
   coord_cartesian(ylim = c(0, 500))
@@ -461,4 +456,4 @@ ml, height = 10, width = 12)
 
 
  ml <- arrangeGrob(grobs = theplot, ncol = 2, nrow = 4, plot = F)
-  ggsave(file = file.path(FIGDIR, "theplot.svg"), plot = ml, height = 17, width = 26)
+  ggsave(file = file.path(FIGDIR, "theplot.svg"), plot = ml, height = 20, width = 26)
