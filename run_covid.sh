@@ -22,6 +22,22 @@ filename="covid-status-$(date +%Y-%m-%d).svg"
 today="covid-status-today.svg"
 echo $outname
 
+# copy figures and link
 cp $FIGDIR/$filename $WWWDIR
 ln -sf $WWWDIR/$filename $WWWDIR/$today
-cp $DIR/Cointreau/index.html $WWWDIR
+
+# prepare html
+cp $DIR/Cointreau/index.tmpl $WWWDIR/index.html
+sed -i "s/<DATE>/$(date)/g" "$WWWDIR/index.html"
+
+for i in $(seq -10 -1);
+do
+	ll=$(date -d "($date) $i days" +%Y-%m-%d);
+	if [ -f $FIGDIR/covid-status-$ll.svg ] ; then
+		echo $ll
+		cp $FIGDIR/covid-status-$ll.svg $WWWDIR
+		insert="<br/> <font size="3" > Forecasts at <a href=http://wilma.to.isac.cnr.it/diss/paolo/covid-19/covid-status-$ll.svg >$ll.</a></i> </font>"
+		sed "/past days/a ${insert}" -i "$WWWDIR/index.html"
+	fi
+done;
+#<a href=http://wilma.to.isac.cnr.it/diss/paolo/covid-19/ >GitHub repository of Italian Civil Protection.</a></i>

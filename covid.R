@@ -31,11 +31,11 @@ dir.create(FIGDIR_WOR, recursive = T)
 # for updates
 now <- Sys.time()
 
-# up to which day perform the forecast
-forecast_date <- as.Date(now)
-# forecast_date <- as.Date(now)-10
+# forecast mode: run it on today or on the last 5 days
+forecast_mode <- "today"
+#forecast_mode <- "reforecast"
 
-# setup
+# select regions and countries
 countries <- c("Italy", "Spain", "China", "France", "United Kingdom", "Germany", "Iran", "Korea, South", "Netherlands", "US")
 regions <- c("Lombardia", "Veneto", "Emilia Romagna", "Piemonte", "Marche", "Liguria")
 
@@ -56,8 +56,16 @@ theme_calendar <- function(base_size = 18) {
     )
 }
 
+# option for forecast date
+if (forecast_mode == "today") {
+  forecast_dates <-  as.Date(now) 
+} else if (forecast_mode == "reforecast") {
+  forecast_dates <- seq(as.Date(now) - 5, as.Date(now) - 1, by = 1)
+  print(forecast_dates)
+}
+
 # gompertz fitter
-predict.covid <- function(calendar, death, name = "Italy", end_date = forecast_date, total_length = 150, min_death = 5, verbose = F) {
+predict.covid <- function(calendar, death, name = "Italy", end_date = as.Date(now), total_length = 150, min_death = 5, verbose = F) {
 
   # Gompertz initialization parameters
   alpha <- 9526
@@ -65,8 +73,8 @@ predict.covid <- function(calendar, death, name = "Italy", end_date = forecast_d
   k <- 0.0028
 
   # subset death up to the day of forecast
-  if (forecast_date == as.Date(Sys.time())) {
-    death <- death[1:which(calendar == forecast_date)]
+  if (end_date != as.Date(Sys.time())) {
+    death <- death[1:which(calendar == end_date)]
   }
 
   # days
@@ -104,14 +112,26 @@ predict.covid <- function(calendar, death, name = "Italy", end_date = forecast_d
   # lagged
   lagged.death <- death[death > 100]
 
+  # reliability of the prediction
+  if (max(delta.gompertz) > max(predict.gompertz)) {
+    validity <- 0 
+  } else {
+    validity <- 1
+  }
+
   # outlist
   out <- list(
     calendar = calendar, days = 1:length(calendar), death = c(death, rep(NA, length(calendar) - length(death))),
     lagged = c(lagged.death, rep(NA, length(calendar) - length(lagged.death))),
     predict = predict.gompertz, upper = upper.gompertz, lower = lower.gompertz,
-    delta = delta.gompertz, name = rep(name, length(calendar))
+    delta = delta.gompertz, name = rep(name, length(calendar)),
+    validity = factor(rep(validity, length(calendar)))
   ) # , coef = coef(nls.gompertz))
 }
+
+for (i in seq_along(forecast_dates)) {
+  forecast_date <- forecast_dates[i]
+  print(forecast_date)
 
 # load files
 file_ita <- file.path(DIR_ITA, "dpc-covid19-ita-andamento-nazionale.json")
@@ -149,7 +169,7 @@ for (country in countries) {
   }
 
   # call covid prediction
-  out_country[[country]] <- predict.covid(world_plot_calendar, death, total_length = end, name = country, verbose = T)
+  out_country[[country]] <- predict.covid(world_plot_calendar, death, end_date = forecast_date, total_length = end, name = country, verbose = T)
 
   # print info
   print(paste(country, ":", rev(death)[1], "->", rev(diff(death))[1]))
@@ -188,12 +208,17 @@ forecast[which(forecast[, 3] > forecast[, 2]), 2:3] <- NA
 maxforecast[which(maxforecast[, 3] > maxforecast[, 2]), 2:3] <- NA
 legend_text <- paste0(countries, ": ", round(forecast[, 2]), "+-", round(forecast[, 3]))
 legend_text2 <- paste0(countries, ": ", round(maxforecast[, 2]), "+-", round(maxforecast[, 3]))
+df$upper[df$validity==0] <- 0
+df$lower[df$validity==0] <- 0
 
 # ggplot conversion of world plots
 world_daily <- list()
 theplot[[5]] <- world_daily[[1]] <- ggplot(df) +
   geom_point(mapping = aes(x = calendar, y = death, col = name)) +
-  geom_line(mapping = aes(x = calendar, y = predict, col = name)) +
+  geom_line(mapping = aes(x = calendar, y = predict, col = name, linetype = validity)) + 
+  #geom_ribbon(aes(x = calendar, y = predict, ymin = lower, ymax = upper, fill = name), alpha = .2, size = 0.1) +
+  #scale_fill_manual(values = kol, guide = "none") +
+  scale_linetype_manual(values = c("solid", "dashed"), guide = "none") +
   labs(title = paste0("World Estimated COVID-19 deaths at ", forecast_date), x = "", y = "# of deaths") +
   theme_calendar(base_size = bsize) +
   scale_x_date(date_breaks = "2 week", date_labels = "%d %b", limits = xdates) +
@@ -202,7 +227,10 @@ theplot[[5]] <- world_daily[[1]] <- ggplot(df) +
 
 theplot[[6]] <- world_daily[[2]] <- ggplot(df) +
   geom_point(df, mapping = aes(x = calendar, y = c(0, diff(death)), col = name)) +
-  geom_line(df, mapping = aes(x = calendar, y = c(0, diff(predict)), col = name)) +
+  geom_line(df, mapping = aes(x = calendar, y = c(0, diff(predict)), col = name, linetype = validity)) +
+  #geom_ribbon(aes(x = calendar, y = c(0,diff(predict)), ymin = c(0, diff(lower)), ymax = c(0,diff(upper)), fill = name), alpha = .2, size = 0.1)  +
+  #scale_fill_manual(values = kol, guide = "none") +
+  scale_linetype_manual(values = c("solid", "dashed"), guide = "none") +
   labs(title = paste0("World Estimated daily COVID-19 deaths at ", forecast_date), x = "", y = "# of deaths") +
   theme_calendar(base_size = bsize) +
   scale_x_date(date_breaks = "2 week", date_labels = "%d %b", limits = xdates) +
@@ -229,15 +257,16 @@ plot_calendar <- seq(calendar[1], calendar[1] + end - 1, 1)
 #predict.exp <- exp(coef(fit)[1]) * exp(coef(fit)[2] * 1:end)
 
 # italian prediction
-out_italy <- predict.covid(plot_calendar, death, total_length = end, name = "Italy", verbose = T)
+out_italy <- predict.covid(plot_calendar, death, end_date = forecast_date, total_length = end, name = "Italy", verbose = T)
 df <- as.data.frame(out_italy)
 
 # useful text to plot
-saturation_text <- paste0("Saturation", "= ", round(max(df$predict)), "+-", round(max(df$delta)))
-predict_text <- paste("Tomorrow Total Forecast = ", round(df$predict[length(death)+1])) # , "+-", round(df$delta[last_day+1]) )
-maxdaily_text <- paste0("Max Daily Deaths = ", round(max(diff(df$predict))))
-daysofmax_text <- paste("Day of Max = ", plot_calendar[which.max(diff(df$predict))])
-delta_text <- paste("Tomorrow Delta Forecast = ", round(diff(df$predict)[length(death)])) # , "+-", round(diff(df$delta))[length(death)])
+saturation_text <- paste("Saturation =", round(max(df$predict)), "+-", round(max(df$delta)))
+predict_text <- paste("Tomorrow Total Forecast =", round(df$predict[length(death)+1])) # , "+-", round(df$delta[last_day+1]) )
+maxdaily_text <- paste("Max Daily Deaths =", round(max(diff(df$predict))))
+daysofmax_text <- paste("Day of Max =", plot_calendar[which.max(diff(df$predict))])
+delta_text <- paste("Tomorrow Delta Forecast =", round(diff(df$predict)[length(death)])) # , "+-", round(diff(df$delta))[length(death)])
+first_day_out <- paste("First day below 100 deaths =", plot_calendar[c(0,diff(df$predict))<100 & plot_calendar>as.Date(now)][1])
 
 # ggplot conversion of world plots
 italy_daily <- list()
@@ -266,6 +295,7 @@ theplot[[2]] <- italy_daily[[2]] <- ggplot(df, aes(x = calendar, col = name)) +
   annotate("text", x = xdates[1], y = 1400, label = maxdaily_text, size = 5, hjust = 0) +
   annotate("text", x = xdates[1], y = 1250, label = daysofmax_text, size = 5, hjust = 0) +
   annotate("text", x = xdates[1], y = 1100, label = delta_text, size = 5, hjust = 0) +
+  annotate("text", x = xdates[1], y = 950,  label = first_day_out, size = 5, hjust = 0) +
   annotate("text", x = xdates[2], y = 1400, label = paste0("Last Updated: ", now), hjust = 1) +
   coord_cartesian(ylim = c(0, 1500))
 
@@ -291,7 +321,7 @@ out_region <- list()
 for (region in regions) {
   death <- death_regions[which(full_regions == region)]
 
-  out_region[[region]] <- predict.covid(regions_plot_calendar, death, total_length = end, name = region, verbose = T)
+  out_region[[region]] <- predict.covid(regions_plot_calendar, death, end_date = forecast_date, total_length = end, name = region, verbose = T)
 
   # print info
   print(paste(region, ":", rev(death)[1], "->", rev(diff(death))[1]))
@@ -308,14 +338,17 @@ forecast[which(forecast[, 3] > forecast[, 2]), 2:3] <- NA
 maxforecast[which(maxforecast[, 3] > maxforecast[, 2]), 2:3] <- NA
 legend_text <- paste0(regions, ": ", round(forecast[, 2]), "+-", round(forecast[, 3]))
 legend_text2 <- paste0(regions, ": ", round(maxforecast[, 2]), "+-", round(maxforecast[, 3]))
+df$upper[df$validity==0] <- 0
+df$lower[df$validity==0] <- 0
 
 # ggplot conversion of world plots
 region_daily <- list()
 theplot[[3]] <- region_daily[[1]] <- ggplot(df) +
   geom_point(mapping = aes(x = calendar, y = death, col = name)) +
-  geom_line(mapping = aes(x = calendar, y = predict, col = name)) +
-  # geom_ribbon(aes(x = calendar, y = predict, ymin = lower, ymax = upper, fill = name), alpha = .2, size = 0.1)  +
+  geom_line(mapping = aes(x = calendar, y = predict, col = name, linetype=validity)) +
+  geom_ribbon(aes(x = calendar, y = predict, ymin = lower, ymax = upper, fill = name), alpha = .2, size = 0.1)  +
   scale_fill_manual(values = kol, guide = "none") +
+  scale_linetype_manual(values = c("solid", "dashed"), guide = "none") +
   labs(title = paste0("Italian Regional Estimated COVID-19 deaths at ", forecast_date), x = "", y = "# of deaths") +
   theme_calendar(base_size = bsize) +
   scale_x_date(date_breaks = "2 week", date_labels = "%d %b", limits = xdates) +
@@ -324,14 +357,15 @@ theplot[[3]] <- region_daily[[1]] <- ggplot(df) +
 
 theplot[[4]] <- region_daily[[2]] <- ggplot(df) +
   geom_point(df, mapping = aes(x = calendar, y = c(0, diff(death)), col = name)) +
-  geom_line(df, mapping = aes(x = calendar, y = c(0, diff(predict)), col = name)) +
-  # geom_ribbon(aes(x = calendar, y = c(0,diff(predict)), ymin = c(0, diff(lower)), ymax = c(0,diff(upper)), fill = name), alpha = .2, size = 0.1)  +
+  geom_line(df, mapping = aes(x = calendar, y = c(0, diff(predict)), linetype = validity, col = name)) +
+  geom_ribbon(aes(x = calendar, y = c(0,diff(predict)), ymin = c(0, diff(lower)), ymax = c(0,diff(upper)), fill = name), alpha = .2, size = 0.1)  +
   scale_fill_manual(values = kol, guide = "none") +
+  scale_linetype_manual(values = c("solid", "dashed"), guide = "none") +
   labs(title = paste0("Italian Regions Estimated daily COVID-19 deaths at ", forecast_date), x = "", y = "# of deaths") +
   theme_calendar(base_size = bsize) +
   scale_x_date(date_breaks = "2 week", date_labels = "%d %b", limits = xdates) +
   scale_color_manual(values = kol, labels = legend_text2) +
-  coord_cartesian(ylim = c(0, 500))
+  coord_cartesian(ylim = c(0, 600))
 
 ml <- arrangeGrob(grobs = region_daily, ncol = 1, nrow = 2, plot = F)
 ggsave(
@@ -343,5 +377,7 @@ ggsave(
 ml <- arrangeGrob(grobs = theplot, ncol = 2, nrow = 4, plot = F)
 ggsave(
   file = file.path(FIGDIR, paste0("covid-status-", forecast_date, ".svg")),
-  plot = ml, height = 22, width = 22, system_fonts = list(sans = "Arial")
+  plot = ml, height = 22, width = 22, system_fonts = list(sans = "Helvetica")
 )
+
+}
