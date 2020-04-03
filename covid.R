@@ -37,7 +37,7 @@ forecast_mode <- "today"
 
 # select regions and countries
 countries <- c("Italy", "Spain", "China", "France", "United Kingdom", "Germany", "Iran", "Netherlands", "US")
-regions <- c("Lombardia", "Veneto", "Emilia-Romagna", "Piemonte", "Marche", "Liguria")
+regions <- c("Lombardia", "Veneto", "Emilia-Romagna", "Piemonte", "Marche", "Liguria", "Toscana")
 
 # days of prediction since the first data
 end <- 210
@@ -54,6 +54,13 @@ theme_calendar <- function(base_size = 18) {
       legend.justification = c("left", "top"), legend.box.just = "right",
       legend.background = element_rect(fill = "transparent"), legend.title = element_blank()
     )
+}
+# moving average (beta)
+ma <- function(x, n = 5) {
+  avg <- na.omit(filter(x, rep(1 / n, n), sides = 2))
+  d <- floor(n/2)
+  out <- c(x[1:d], avg, x[(length(x)-d+1):length(x)])
+  return(out)
 }
 
 # option for forecast date
@@ -128,7 +135,7 @@ somelegend <- function(df) {
 }
 
 # gompertz fitter
-predict.covid <- function(calendar, death, name = "Italy", end_date = as.Date(now), total_length = 150, min_death = 5, verbose = F) {
+predict.covid <- function(calendar, death, name = "Italy", end_date = as.Date(now), total_length = 150, min_death = 5, verbose = F, moving_avg = T) {
 
   # Gompertz initialization parameters
   # They are taken from here, but as long as they converge they are fine
@@ -149,6 +156,11 @@ predict.covid <- function(calendar, death, name = "Italy", end_date = as.Date(no
   # remove missing values
   days <- days[!is.na(death)]
   death <- death[!is.na(death)]
+
+  # if want to use movinng avg
+  if (moving_avg) {
+    death <- ma(death,5)
+  }
 
   # create dataframe
   data <- data.frame(days = days[death > min_death], death = death[death > min_death])
@@ -258,14 +270,14 @@ theplot[[7]] <- world_plot[[1]] <- ggplot(df, aes(x = days, y = lagged, col = na
   labs(title = "World COVID-19 Deaths when exceeding 100 deaths", x = "# days since 100 deaths", y = "# of deaths") +
   theme_calendar() +
   scale_color_manual(values = kol) +
-  coord_cartesian(xlim = c(0, 60), ylim = c(0, 10000))
+  coord_cartesian(xlim = c(0, 60), ylim = c(0, 15000))
 
 theplot[[8]] <- world_plot[[2]] <- ggplot(df, aes(x = days, y = c(0, diff(lagged)), col = name)) +
   geom_point() + geom_line() +
   labs(title = "World COVID-19 Daily Deaths when exceeding 100 deaths", x = "# days  since 100 deaths", y = "# of deaths") +
   theme_calendar() +
   scale_color_manual(values = kol) +
-  coord_cartesian(xlim = c(0, 60), ylim = c(0, 1000))
+  coord_cartesian(xlim = c(0, 60), ylim = c(0, 1500))
 
 ml <- arrangeGrob(grobs = world_plot, ncol = 1, nrow = 2, plot = F)
 ggsave(
@@ -294,7 +306,7 @@ theplot[[5]] <- world_daily[[1]] <- ggplot(df) +
   theme_calendar(base_size = bsize) +
   scale_x_date(date_breaks = "2 week", date_labels = "%d %b", limits = xdates) +
   scale_color_manual(values = kol, labels = mm$forecast) +
-  coord_cartesian(ylim = c(0, 20000))
+  coord_cartesian(ylim = c(0, 15000))
 
 theplot[[6]] <- world_daily[[2]] <- ggplot(df) +
   geom_point(df, mapping = aes(x = calendar, y = c(0, diff(death)), col = name)) +
@@ -306,7 +318,7 @@ theplot[[6]] <- world_daily[[2]] <- ggplot(df) +
   theme_calendar(base_size = bsize) +
   scale_x_date(date_breaks = "2 week", date_labels = "%d %b", limits = xdates) +
   scale_color_manual(values = kol, labels = mm$diff) +
-  coord_cartesian(ylim = c(0, 1000))
+  coord_cartesian(ylim = c(0, 1500))
 
 ml <- arrangeGrob(grobs = world_daily, ncol = 1, nrow = 2, plot = F)
 ggsave(
@@ -387,7 +399,11 @@ ggsave(
 )
 
 # create a R workspace for storing the forecast in time
-evo_df <- unique(rbind(evo_df, list(date = as.Date(forecast_date), country = "Italy", predict = max(df$predict), lower = max(df$lower), upper = max(df$upper))))
+if (forecast_mode == "today") {
+  evo_df <- subset(evo_df, date != as.Date(now))
+}
+evo_df <- unique(rbind(evo_df, list(date = as.Date(forecast_date), country = "Italy", 
+                                    predict = max(df$predict), lower = max(df$lower), upper = max(df$upper))))
 save(evo_df, file=evo_file)
 
 
@@ -529,6 +545,7 @@ ggsave(
 #             nrows = 2, shareX = T, which_layout = 1)
 #htmlwidgets::saveWidget(as_widget(f), file.path(FIGDIR, "plotly.html"), selfcontained=F)
 
-
-
+italian_table <-  cbind(Calendar = out_italy$calendar, Italy = out_italy$predict, 
+                        as.data.frame(lapply(out_region, "[[", "predict")))
+write.csv(italian_table, file.path(COVID,"Cointreau/forecasts",paste0("italian-forecast-",forecast_date,".csv")))
 
