@@ -2,17 +2,16 @@
 DIR="/home/paolo/covid"
 ITADIR=$DIR/COVID-ITALY
 WORDIR=$DIR/COVID-WORLD
+ENGDIR=$DIR/COVID-UK
 WWWDIR="/var/www/html/diss/paolo/covid-19"
 FIGDIR="/work/users/paolo/figures/COVID-19"
 
 # fetch of italian and world data
-cd $ITADIR
-git fetch
-git pull
-
-cd $WORDIR
-git fetch
-git pull
+for dir in $ITADIR $WORDIR $ENGDIR ; do
+	cd $dir
+	git fetch
+	git pull
+done
 
 # run the script
 /usr/bin/Rscript $DIR/Cointreau/covid.R
@@ -46,3 +45,6 @@ convert -delay 100 -loop 0 $FIGDIR/forecast/italy/*.pdf $WWWDIR/italyGIF.gif
 
 # prediction
 cp $FIGDIR/forecast*evolution.svg $WWWDIR
+
+# england prediction
+cp $FIGDIR/forecast/england/*.pdf $WWWDIR/england
