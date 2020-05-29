@@ -461,7 +461,7 @@ for (i in seq_along(forecast_dates)) {
   maxdaily_text <- paste("Max Daily Deaths =", round(max(diff(df$predict))))
   daysofmax_text <- paste("Day of Max =", plot_calendar[which.max(c(0, diff(df$predict)))])
   delta_text <- paste("Tomorrow Delta Forecast =", round(diff(df$predict)[length(death)])) # , "+-", round(diff(df$delta))[length(death)])
-  first_day_out <- paste("First day below 100 deaths =", plot_calendar[c(0, diff(df$predict)) < 100 & plot_calendar > as.Date(now)][1])
+  first_day_out <- paste("First day below 100 deaths =", plot_calendar[c(0, diff(df$predict)) < 100 & c(0,diff(c(0,diff(df$predict))))][1])
 
   # ggplot conversion of world plots
   italy_daily <- list()
