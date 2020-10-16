@@ -1,29 +1,19 @@
-# loading packages
-library("rjson")
-library("growthmodels")
-library("minpack.lm")
-library("data.table")
-library("ggplot2")
-library("gridExtra")
-library("nlstools")
-library("svglite")
-library("scales")
-library("wpp2019")
-
-# load wordl population data
-data(pop)
 
 # directories declaration
 # COVID <- "/Users/paolo/Desktop/covid"
 COVID <- "/home/paolo/covid"
+source(file.path(COVID, "Cointreau/functions.R"))
 
 # need local fectch of John Hopkins and Italian Civil Protection data
 DIR_ITA <- file.path(COVID, "COVID-ITALY/dati-json")
 DIR_WORLD <- file.path(COVID, "COVID-WORLD/csse_covid_19_data/csse_covid_19_time_series")
 DIR_ENGLAND <- file.path(COVID, "COVID-UK")
 
+# wave: first or second?
+wave <- 2
+
 # for figures
-FIGDIR <- "/work/users/paolo/figures/COVID-19"
+FIGDIR <- file.path("/work/users/paolo/figures/COVID-19", wave)
 FIGDIR_ITA <- file.path(FIGDIR, "forecast", "italy")
 FIGDIR_WOR <- file.path(FIGDIR, "forecast", "world")
 FIGDIR_REG <- file.path(FIGDIR, "forecast", "italian_regions")
@@ -33,8 +23,8 @@ for (DIR in c(FIGDIR_ITA, FIGDIR_REG, FIGDIR_WOR, FIGDIR_ENG)) {
 }
 
 # time evolution files
-italy_evo_file <- file.path(FIGDIR, "daily_prediction_evolution.Rsave")
-world_evo_file <- file.path(FIGDIR, "world_daily_prediction_evolution.Rsave")
+italy_evo_file <- file.path(FIGDIR, paste0("wave",wave,"_daily_prediction_evolution.Rsave"))
+world_evo_file <- file.path(FIGDIR, paste0("wave",wave,"_world_daily_prediction_evolution.Rsave"))
 
 # for updates
 now <- Sys.time()
@@ -44,34 +34,66 @@ forecast_mode <- "today"
 #forecast_mode <- "reforecast"
 
 # select regions and countries
-countries <- c("Italy", "Spain", "China", "France", "United Kingdom", 
-               "Germany", "Brazil", "Netherlands", "US", "Belgium", "Sweden")
-regions <- c("Lombardia", "Veneto", "Emilia-Romagna", "Piemonte", "Marche", "Liguria", "Toscana")
-england_regions <- c("England", "East Of England", "London", "Midlands", "North East And Yorkshire",
-  "North West", "South East", "South West")
+if (wave == 1) {
+  countries <- c(
+    "Italy", "Spain", "China", "France", "United Kingdom",
+    "Germany", "Brazil", "Netherlands", "US", "Belgium", "Sweden"
+  )
+  regions <- c("Lombardia", "Veneto", "Emilia-Romagna", "Piemonte", "Marche", "Liguria", "Toscana")
+} else if (wave == 2) {
+  countries <- c(
+    "Italy", "Spain", "France", "United Kingdom",
+    "Germany", "Netherlands", "Belgium", "Sweden"
+  )
+  regions <- c("Lombardia", "Veneto", "Emilia-Romagna", "Piemonte", "Campania", "Liguria", "Toscana")
+}
+england_regions <- c(
+  "England", "East Of England", "London", "Midlands", "North East And Yorkshire",
+  "North West", "South East", "South West"
+)
 
 # days of prediction since the first data
-end <- 210
+# startin date for estimation
+# first forecasting date
+if (wave == 1) {
+  end <- 250
+  starting_date <- as.Date("2020-02-24")
+  first_forecast_date <- as.Date("2020-03-01")
+  last_forecast_date <- as.Date("2020-08-15")
+} else if (wave == 2) {
+  end <- 700
+  starting_date <- as.Date("2020-08-15")
+  first_forecast_date <- as.Date("2020-10-01")
+  last_forecast_date <- as.Date(now)
+}
 
 # graphical parameter
 bsize <- 18
-xdates <- as.Date(c("2020-01-20", "2020-07-01"))
-lim_world_cdf <- c(0, 35000)
-lim_world_pdf <- c(0, 1200)
-lim_rel_world_cdf <- c(0, 600)
-lim_rel_world_pdf <- c(0, 30)
-lim_italy_cdf <- c(0, 40000)
-lim_italy_pdf <- c(0, 1000)
-lim_regio_cdf <- c(0, 20000)
-lim_regio_pdf <- c(0, 500)
-lim_eng_cdf <- c(0, 25000)
-lim_eng_pdf <- c(0, 750)
+if (wave == 1) {
+  xdates <- as.Date(c("2020-01-20", "2020-09-01"))
+  gf <- 1
+} else if (wave == 2) {
+  xdates <- as.Date(c("2020-08-15", "2021-01-31"))
+  gf <- 1/7
+}
+lim_world_cdf <- c(0, 50000) * gf
+lim_world_pdf <- c(0, 1200) * gf
+lim_rel_world_cdf <- c(0, 800) * gf
+lim_rel_world_pdf <- c(0, 30) * gf
+lim_italy_cdf <- c(0, 40000) * gf
+lim_italy_pdf <- c(0, 1000) * gf
+lim_regio_cdf <- c(0, 18000) * gf
+lim_regio_pdf <- c(0, 500) * gf
+lim_eng_cdf <- c(0, 30000) * gf
+lim_eng_pdf <- c(0, 750) * gf
+daysfromthestart <- 210
 
 # colors
-kol <- c("darkgreen", "red", "orange", "blue", "brown", 
-         "black", "lightgreen", "darkviolet", "aquamarine3", "pink", 
-         "dodgerblue"
-         )
+kol <- c(
+  "darkgreen", "red", "orange", "blue", "brown",
+  "black", "lightgreen", "darkviolet", "aquamarine3", "pink",
+  "dodgerblue"
+)
 
 # for text plotting
 delta_italy_cdf <- diff(lim_italy_cdf) / 16
@@ -81,220 +103,23 @@ delta_italy_pdf <- diff(lim_italy_pdf) / 16
 if (forecast_mode == "today") {
 
   # set forecast for today and load evolution files
-  forecast_dates <- as.Date(now)
+  forecast_dates <- last_forecast_date
   load(italy_evo_file)
   load(world_evo_file)
 } else if (forecast_mode == "reforecast") {
 
   # define loop on forecast dates, remove old evo file and declare evo arrays
-  first_forecast_date <- as.Date("2020-03-01")
-  forecast_dates <- seq(first_forecast_date, as.Date(now) - 1, by = 1)
+  forecast_dates <- seq(first_forecast_date, last_forecast_date - 1, by = 1)
   file.remove(italy_evo_file, world_evo_file)
   world_evo_df <- italy_evo_df <- data.frame(
     date = as.Date(character()), country = character(),
     predict = numeric(), upper = numeric(), lower = numeric()
   )
-
 }
 
-# load the R workspace
-#if (file.exists(italy_evo_file)) {
-  #load(italy_evo_file)
-#} else {
-  #italy_evo_df <- data.frame(
-    #date = as.Date(character()), country = character(),
-    #predict = numeric(), upper = numeric(), lower = numeric()
-  #)
-#}
-
-# load the R workspace
-#if (file.exists(world_evo_file)) {
-  #load(world_evo_file)
-#} else {
-  #world_evo_df <- data.frame(
-    #date = as.Date(character()), country = character(),
-    #predict = numeric(), upper = numeric(), lower = numeric()
-  #)
-#}
-
-#############
-# FUNCTIONS #
-#############
-
-# graphical function
-theme_calendar <- function(base_size = 18) {
-  theme_light(base_size = base_size) +
-    theme(
-      axis.text.x = element_text(angle = 60, hjust = 1), legend.position = c(.01, 0.99),
-      legend.justification = c("left", "top"), legend.box.just = "right",
-      legend.background = element_rect(fill = "transparent"), legend.title = element_blank()
-    )
-}
-
-# moving average
-ma <- function(x, n = 5) {
-  avg <- na.omit(filter(x, rep(1 / n, n), sides = 2))
-  d <- floor(n / 2)
-  out <- c(x[1:d], avg, x[(length(x) - d + 1):length(x)])
-  return(out)
-}
-
-# set up a dataframe from a list for a simpler plotting
-dataframing <- function(input_list, names) {
-  df <- rbindlist(input_list, fill = T)
-
-  # factorize names and set boundaries to 0 when validity is 0
-  df$name <- factor(df$name, levels = names)
-  df$upper[df$validity == 0] <- 0
-  df$lower[df$validity == 0] <- 0
-  return(df)
-}
-
-# use wpop2019 to define country population
-world_population <- function(country) {
-  if (country == "US") { 
-    country <- "United States of America"
-  }
-  population <- subset(pop, name == country)["2020"] / 1000
-  return(as.numeric(population))
-}
-
-# create a couple of useful annotations
-somelegend <- function(df) {
-
-  # predict and delta for both the plots
-  forecast <- unique(merge(aggregate(cbind(predict, delta, lower, upper) ~ name, df, max), df[, c("name", "validity", "population")]))
-  maxforecast <- unique(merge(aggregate(cbind(predict, delta) ~ name, df, function(x) max(diff(x))), df[, c("name", "validity", "population")]))
-
-  # order to follow factor order
-  forecast <- forecast[order(forecast$name), ]
-  maxforecast <- maxforecast[order(maxforecast$name), ]
-
-  # set to NA when validity is negative
-  maxforecast[maxforecast$validity == 0, c("predict", "delta")] <- NA
-  forecast[forecast$validity == 0, c("predict", "delta", "lower", "upper")] <- NA
-
-  # create legends
-  legend_forecast <- paste0(forecast[, 1], ": ", round(as.numeric(forecast[, 2])), "+-", round(as.numeric(forecast[, 3])))
-  legend_diff <- paste0(maxforecast[, 1], ": ", round(maxforecast[, 2]), "+-", round(maxforecast[, 3]))
-  legend_ratio <- paste0(forecast[, 1], ": ", round(as.numeric(forecast[, 2])/forecast[, 7]), "+-", round(as.numeric(forecast[, 3])/forecast[, 7]))
-
-  # return a list
-  outlist <- list(forecast = legend_forecast, diff = legend_diff, values = forecast, ratio = legend_ratio)
-  return(outlist)
-}
-
-# gompertz fitter
-predict.covid <- function(calendar, death, name = "Italy", end_date = as.Date(now), total_length = 150, min_death = 5, verbose = F, moving_avg = T) {
-
-  # Gompertz initialization parameters
-  # They are taken from here, but as long as they converge they are fine
-  # https://www.researchgate.net/post/Is_there_an_R_code_for_Gompertz_model
-  # alpha <- 9526
-  alpha <- 15000
-  beta <- 9.1618
-  # k <- 0.0028
-  k <- 0.002
-
-  # subset death up to the day of forecast
-  if (end_date != as.Date(Sys.time())) {
-    death <- death[1:which(calendar == end_date)]
-  }
-
-  # days
-  days <- 1:length(death)
-
-  # remove missing values
-  days <- days[!is.na(death)]
-  death <- death[!is.na(death)]
-
-  # if want to use movinng avg
-  if (moving_avg) {
-    death <- ma(death, 5)
-  }
-
-  # create dataframe
-  data <- data.frame(days = days[death >= min_death], death = death[death >= min_death])
-  if (verbose) {
-    print(data)
-  }
-
-  # if there is not enough data, quite
-  if (length(data$death) < 5) {
-    print("No valid data, quitting")
-    return(NULL)
-  }
-
-
-  # gompertz fit
-  nls.gompertz <- minpack.lm::nlsLM(data$death ~ alpha * exp(-beta * exp(-k * data$days)),
-    data = data,
-    start = list(alpha = alpha, beta = beta, k = k), control = list(maxiter = 500)
-  )
-
-  # upper and lower bound coefficinets
-  # upper.coef.gompertz <- coef(nls.gompertz) + 2 * summary(nls.gompertz)$parameter[, 2]
-  # lower.coef.gompertz <- coef(nls.gompertz) - 2 * summary(nls.gompertz)$parameter[, 2]
-  confidence <- confint2(nls.gompertz)
-  upper.coef.gompertz <- confidence[, "97.5 %"]
-  lower.coef.gompertz <- confidence[, "2.5 %"]
-
-  # test with permutation
-  # space <- 5
-  # seq_alpha <- seq(lower.coef.gompertz[["alpha"]], upper.coef.gompertz[["alpha"]], length = space)
-  # seq_beta <- seq(lower.coef.gompertz[["beta"]], upper.coef.gompertz[["beta"]], length = space)
-  # permutation <- expand.grid(seq_alpha, seq_beta)
-  # permutation.gompertz <- array(NA, dim=c(space*space, total_length))
-  # for (k in 1:(space*space)) {
-  #  permutation.gompertz[k,] <- growthmodels::gompertz(1:total_length,
-  #                                                     alpha = permutation[k,1],
-  #                                                     beta = permutation[k,2],
-  #                                                     k = coef(nls.gompertz)[["k"]])
-  # }
-  # upper.gompertz <- apply(permutation.gompertz, 2, max)
-  # lower.gompertz <- apply(permutation.gompertz, 2, min)
-
-
-  # predict gompertz
-  # print(coef(nls.gompertz))
-  predict.gompertz <- growthmodels::gompertz(1:total_length,
-    alpha = coef(nls.gompertz)[["alpha"]],
-    beta = coef(nls.gompertz)[["beta"]], k = coef(nls.gompertz)[["k"]]
-  )
-  upper.gompertz <- growthmodels::gompertz(1:total_length,
-    alpha = upper.coef.gompertz[["alpha"]],
-    beta = upper.coef.gompertz[["beta"]], k = coef(nls.gompertz)[["k"]]
-  )
-  lower.gompertz <- growthmodels::gompertz(1:total_length,
-    alpha = lower.coef.gompertz[["alpha"]],
-    beta = lower.coef.gompertz[["beta"]], k = coef(nls.gompertz)[["k"]]
-  )
-  delta.gompertz <- abs(upper.gompertz - lower.gompertz) / 2
-
-  # lower boundary cannot go below zero
-  lower.gompertz[lower.gompertz < 0] <- 0
-
-  # lagged
-  lagged.death <- death[death > 100]
-
-  # reliability of the prediction
-  if (max(delta.gompertz) > max(predict.gompertz) / 2) {
-    validity <- 0
-  } else {
-    validity <- 1
-  }
-
-  # outlist
-  out <- list(
-    calendar = calendar, days = 1:length(calendar), death = c(death, rep(NA, length(calendar) - length(death))),
-    lagged = c(lagged.death, rep(NA, length(calendar) - length(lagged.death))),
-    predict = predict.gompertz, upper = upper.gompertz, lower = lower.gompertz,
-    delta = delta.gompertz, name = rep(name, length(calendar)),
-    validity = factor(rep(validity, length(calendar))),
-    population = rep(world_population(name), length(calendar))
-  ) # , coef = coef(nls.gompertz))
-}
-
+#####################
+# FORECAST 
+####################
 
 # loop on the forecast dates
 for (i in seq_along(forecast_dates)) {
@@ -362,7 +187,7 @@ for (i in seq_along(forecast_dates)) {
     labs(title = "World COVID-19 Deaths when exceeding 100 deaths", x = "# days since 100 deaths", y = "# of deaths") +
     theme_calendar() +
     scale_color_manual(values = kol) +
-    coord_cartesian(xlim = c(0, 100), ylim = lim_world_cdf)
+    coord_cartesian(xlim = c(0, daysfromthestart), ylim = lim_world_cdf)
 
   theplot[[10]] <- world_plot[[2]] <- ggplot(df, aes(x = days, y = c(0, diff(lagged)), col = name)) +
     geom_point() +
@@ -370,7 +195,7 @@ for (i in seq_along(forecast_dates)) {
     labs(title = "World COVID-19 Daily Deaths when exceeding 100 deaths", x = "# days  since 100 deaths", y = "# of deaths") +
     theme_calendar() +
     scale_color_manual(values = kol) +
-    coord_cartesian(xlim = c(0, 100), ylim = lim_world_pdf)
+    coord_cartesian(xlim = c(0, daysfromthestart), ylim = lim_world_pdf)
 
   ml <- arrangeGrob(grobs = world_plot, ncol = 1, nrow = 2, plot = F)
   ggsave(
@@ -440,7 +265,7 @@ for (i in seq_along(forecast_dates)) {
     date = as.Date(rep(forecast_date, length(mm$values$name))),
     country = mm$values$name, predict = mm$values$predict,
     lower = mm$values$lower, upper = mm$values$upper
-  ),stringsAsFactors = FALSE))
+  ), stringsAsFactors = FALSE))
   save(world_evo_df, file = world_evo_file)
 
   #######################
@@ -456,12 +281,12 @@ for (i in seq_along(forecast_dates)) {
   df <- as.data.frame(out_italy)
 
   # useful text to plot
-  saturation_text <- paste("Saturation =", round(max(df$predict)), "+-", round(max(df$delta)))
-  predict_text <- paste("Tomorrow Total Forecast =", round(df$predict[length(death) + 1])) # , "+-", round(df$delta[last_day+1]) )
+  saturation_text <- paste0("Saturation = ", round(max(df$predict)), " [min=", round(max(df$lower)),", max=", round(max(df$upper)),"]")
+  predict_text <- paste("Tomorrow Total Forecast =", round(df$predict[length(df$death[!is.na(df$death)]) + 1])) # , "+-", round(df$delta[last_day+1]) )
   maxdaily_text <- paste("Max Daily Deaths =", round(max(diff(df$predict))))
-  daysofmax_text <- paste("Day of Max =", plot_calendar[which.max(c(0, diff(df$predict)))])
-  delta_text <- paste("Tomorrow Delta Forecast =", round(diff(df$predict)[length(death)])) # , "+-", round(diff(df$delta))[length(death)])
-  first_day_out <- paste("First day below 100 deaths =", plot_calendar[c(0, diff(df$predict)) < 100 & c(0,diff(c(0,diff(df$predict))))][1])
+  daysofmax_text <- paste("Day of Max =", df$calendar[which.max(c(0, diff(df$predict)))])
+  delta_text <- paste("Tomorrow Delta Forecast =", round(diff(df$predict)[length(df$death[!is.na(df$death)])])) # , "+-", round(diff(df$delta))[length(death)])
+  first_day_out <- paste("First day below 100 deaths =", df$calendar[c(0, diff(df$predict)) < 100 & c(0, diff(c(0, diff(df$predict))))][1])
 
   # ggplot conversion of world plots
   italy_daily <- list()
@@ -570,7 +395,7 @@ for (i in seq_along(forecast_dates)) {
     file = file.path(FIGDIR_REG, paste0("italian_regions_COVID_prediction_day_", forecast_date, ".pdf")),
     ml, height = 10, width = 12
   )
-  
+
   # great plot
   ml <- arrangeGrob(grobs = theplot, ncol = 2, nrow = 5, plot = F)
   ggsave(
@@ -593,7 +418,7 @@ forecast_evo[[1]] <- ggplot(italy_evo_df) +
   scale_fill_manual(values = kol, guide = "none") +
   labs(title = paste0("Time Evolution of the Forecasts"), x = "", y = "# of deaths") +
   theme_calendar(base_size = bsize) +
-  scale_x_date(date_breaks = "1 week", date_labels = "%d %b", limits = c(as.Date("2020-03-15"), as.Date(now))) +
+  scale_x_date(date_breaks = "1 week", date_labels = "%d %b", limits = c(first_forecast_date, as.Date(now))) +
   scale_color_manual(values = kol) +
   coord_cartesian(ylim = c(0, 60000))
 
@@ -603,7 +428,7 @@ ggsave(
   ml, height = 9, width = 12
 )
 
-breaks <- c(1000, 2000, 5000, 10000, 20000, 50000, 100000)
+breaks <- c(100, 1000, 2000, 5000, 10000, 20000, 50000, 100000)
 minor_breaks <- rep(1:9, 21) * (10^rep(-10:10, each = 9))
 
 # forcily need to push to date
@@ -617,12 +442,12 @@ forecast_evo[[1]] <- ggplot(world_evo_df) +
   scale_fill_manual(values = kol, guide = "none") +
   labs(title = paste0("Time Evolution of the Forecasts (log)"), x = "", y = "# of deaths") +
   theme_calendar(base_size = bsize) +
-  scale_x_date(date_breaks = "1 week", date_labels = "%d %b", limits = c(as.Date("2020-03-15"), as.Date(now))) +
+  scale_x_date(date_breaks = "1 week", date_labels = "%d %b", limits = c(first_forecast_date, as.Date(now))) +
   # scale_y_continuous(trans="log10",  breaks = c(2000, 5000, 10000, 20000, 50000, 100000, 150000) ,labels = comma) +
   scale_y_log10(breaks = breaks, minor_breaks = minor_breaks, labels = comma) +
   annotation_logticks() +
   scale_color_manual(values = kol) +
-  coord_cartesian(ylim = c(2000, 200000))
+  coord_cartesian(ylim = c(100, 200000))
 
 
 ml <- arrangeGrob(grobs = forecast_evo, ncol = 1, nrow = 1, plot = F)
@@ -648,59 +473,62 @@ write.csv(italian_table, file.path(COVID, "Cointreau/forecasts", paste0("italian
 #######################
 # ENGLAND DATA ANALYSIS #
 #######################
-print("England Analysis...")
 
-# remove useless rows
-good <- 5:length(data_england[, 1])
-england_dates <- as.Date(data_england[good, 1])
-england_plot_calendar <- seq(england_dates[1], england_dates[1] + end - 1, 1)
+if (wave == 1) {
+  print("England Analysis...")
 
-# loop on countries, checks for regions, list handling
-out_england <- list()
-for (region in england_regions) {
-  death <- cumsum(as.numeric(as.character(data_england[good, which(data_england[1, ] == region)])))
+  # remove useless rows
+  good <- 5:length(data_england[, 1])
+  england_dates <- as.Date(data_england[good, 1])
+  england_plot_calendar <- seq(england_dates[1], england_dates[1] + end - 1, 1)
 
-  out_england[[region]] <- predict.covid(england_plot_calendar, death, end_date = forecast_date, total_length = end, name = region)
+  # loop on countries, checks for regions, list handling
+  out_england <- list()
+  for (region in england_regions) {
+    death <- cumsum(as.numeric(as.character(data_england[good, which(data_england[1, ] == region)])))
 
-  # print info
-  print(paste(region, ":", rev(death)[1], "->", rev(diff(death))[1]))
+    out_england[[region]] <- predict.covid(england_plot_calendar, death, end_date = forecast_date, total_length = end, name = region)
+
+    # print info
+    print(paste(region, ":", rev(death)[1], "->", rev(diff(death))[1]))
+  }
+
+  # create a data frame
+  df <- dataframing(out_england, names = england_regions)
+
+  # create legends
+  mm <- somelegend(df)
+
+
+  # ggplot conversion of world plots
+  england_daily <- list()
+  england_daily[[1]] <- ggplot(df) +
+    geom_point(mapping = aes(x = calendar, y = death, col = name)) +
+    geom_line(mapping = aes(x = calendar, y = predict, col = name, linetype = validity)) +
+    geom_ribbon(aes(x = calendar, ymin = lower, ymax = upper, fill = name), alpha = .2, size = 0.1) +
+    scale_fill_manual(values = kol, guide = "none") +
+    scale_linetype_manual(values = c("solid", "dashed"), guide = "none") +
+    labs(title = paste0("England Macro-Area Estimated COVID-19 deaths at ", forecast_date), x = "", y = "# of deaths") +
+    theme_calendar(base_size = bsize) +
+    scale_x_date(date_breaks = "2 week", date_labels = "%d %b", limits = xdates) +
+    scale_color_manual(values = kol, labels = mm$forecast) +
+    coord_cartesian(ylim = lim_eng_cdf)
+
+  england_daily[[2]] <- ggplot(df) +
+    geom_point(df, mapping = aes(x = calendar, y = c(0, diff(death)), col = name)) +
+    geom_line(df, mapping = aes(x = calendar, y = c(0, diff(predict)), linetype = validity, col = name)) +
+    geom_ribbon(aes(x = calendar, ymin = c(0, diff(lower)), ymax = c(0, diff(upper)), fill = name), alpha = .2, size = 0.1) +
+    scale_fill_manual(values = kol, guide = "none") +
+    scale_linetype_manual(values = c("solid", "dashed"), guide = "none") +
+    labs(title = paste0("England Macro-Area Estimated daily COVID-19 deaths at ", forecast_date), x = "", y = "# of deaths") +
+    theme_calendar(base_size = bsize) +
+    scale_x_date(date_breaks = "2 week", date_labels = "%d %b", limits = xdates) +
+    scale_color_manual(values = kol, labels = mm$diff) +
+    coord_cartesian(ylim = lim_eng_pdf)
+
+  ml <- arrangeGrob(grobs = england_daily, ncol = 1, nrow = 2, plot = F)
+  ggsave(
+    file = file.path(FIGDIR_ENG, paste0("england_regions_COVID_prediction_day_", forecast_date, ".pdf")),
+    ml, height = 10, width = 12
+  )
 }
-
-# create a data frame
-df <- dataframing(out_england, names = england_regions)
-
-# create legends
-mm <- somelegend(df)
-
-
-# ggplot conversion of world plots
-england_daily <- list()
-england_daily[[1]] <- ggplot(df) +
-  geom_point(mapping = aes(x = calendar, y = death, col = name)) +
-  geom_line(mapping = aes(x = calendar, y = predict, col = name, linetype = validity)) +
-  geom_ribbon(aes(x = calendar, ymin = lower, ymax = upper, fill = name), alpha = .2, size = 0.1) +
-  scale_fill_manual(values = kol, guide = "none") +
-  scale_linetype_manual(values = c("solid", "dashed"), guide = "none") +
-  labs(title = paste0("England Macro-Area Estimated COVID-19 deaths at ", forecast_date), x = "", y = "# of deaths") +
-  theme_calendar(base_size = bsize) +
-  scale_x_date(date_breaks = "2 week", date_labels = "%d %b", limits = xdates) +
-  scale_color_manual(values = kol, labels = mm$forecast) +
-  coord_cartesian(ylim = lim_eng_cdf)
-
-england_daily[[2]] <- ggplot(df) +
-  geom_point(df, mapping = aes(x = calendar, y = c(0, diff(death)), col = name)) +
-  geom_line(df, mapping = aes(x = calendar, y = c(0, diff(predict)), linetype = validity, col = name)) +
-  geom_ribbon(aes(x = calendar, ymin = c(0, diff(lower)), ymax = c(0, diff(upper)), fill = name), alpha = .2, size = 0.1) +
-  scale_fill_manual(values = kol, guide = "none") +
-  scale_linetype_manual(values = c("solid", "dashed"), guide = "none") +
-  labs(title = paste0("England Macro-Area Estimated daily COVID-19 deaths at ", forecast_date), x = "", y = "# of deaths") +
-  theme_calendar(base_size = bsize) +
-  scale_x_date(date_breaks = "2 week", date_labels = "%d %b", limits = xdates) +
-  scale_color_manual(values = kol, labels = mm$diff) +
-  coord_cartesian(ylim = lim_eng_pdf)
-
-ml <- arrangeGrob(grobs = england_daily, ncol = 1, nrow = 2, plot = F)
-ggsave(
-  file = file.path(FIGDIR_ENG, paste0("england_regions_COVID_prediction_day_", forecast_date, ".pdf")),
-  ml, height = 10, width = 12
-)

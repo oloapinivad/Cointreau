@@ -1,0 +1,79 @@
+<html>
+  <head>
+    <meta http-equiv="CONTENT-TYPE" content="text/html; charset=iso-8859-1"/>
+    <title>COVID-19 forecasts 2nd wave</title>
+  </head>
+
+  <body dir="ltr" lang="en-US" bgcolor="White">
+
+    <div style="margin: 10px 10px 10px 10px; width: 1200px">
+
+
+      <center>
+
+        <br/>
+
+
+          <big>
+            <big>
+             <b><u>COVID-19 statistical forecasts: second wave</u></b>
+            </big>
+	    <br/>
+ 	    <font size="1" > If the page does not update, press shift + refresh </font>
+	    <br/>
+	    <font size="3" > Last update <DATE>  </font>
+            <br/><br/>
+	    <b>Disclaimer: this is a scientific exercise, do not take it too seriously.  
+	    <br/> 
+	    <br> <i> Plots on the left report the cumulated number of deaths, plots on the right the daily number of deaths.
+	    <br> For the second wave calculation, data from 15th August 2020 are considered only.
+	    <br/> FORECASTS SHOWING DASHED LINES AND "NA" IN THEIR ESTIMATE ARE NOT RELIABLE SO FAR.
+	     
+	     <br/>
+	     <br/>
+	     <br/>
+
+
+        <img style="border: 0px solid; width: 1024px" alt="" src="covid-status-today.svg"/>
+        <br/><br/><br/>
+	<i>Italian data from <a href=https://github.com/pcm-dpc/COVID-19 >GitHub repository of Italian Civil Protection.</a></i>
+      <br>
+      <i>World data from <a href=https://github.com/CSSEGISandData/COVID-19 >GitHub repository of Johns Hopkins University.</a></i>
+      <br>
+      <br/>
+      <div style="margin: 10px 10px 10px 10px; width: 1000px">
+      Methodology note </br> 
+      <font size="3" > <i> Forecasts are estimated with Gompertz functions computed via the nls.lm R function. Ribbons show the 95% confidence interval computed with the confint2 R function. 
+      <br>  A 5 day running mean is applied to all data
+      </br> The non-linear model to forecast the evolution is reliable only after one third of its path (Winsor, PNAS, 1932). Hence errors are likely larger than currently estimated in situation where the outbreak is just started. 
+      </br> Saturation values are the alpha parameter of the Gompertz fit. Errors are estimated using the half of the distance between the 2.5% and the 97.5% percentiles. <b> For the 2nd wave, in order to account for errors into the data reporting, the percentiles are computed 100 times adding a Gaussian noise independent for each daily value, that has mean 0 and standard deviation equal to the 20% of the daily mortality. </b> When forecasts error is larger than half of the forecast value, i.e. the forecast is completely unreliable, NA is shown. 
+      </br> Forecasts are updated at least twice a day (07:00 and 19:00). 
+      </br> Some inconsistencies in Italian prediction may arise from slight data differences between the Civil Protection and the Johns Hopkins archives. </br> The code can be found on <a href=https://github.com/oloapinivad/Cointreau >my GitHub repository</a>, althought it is really badly written. </i> </font>
+      </div>
+      <br/><br/><br/>
+
+      <b> Italian Time Evolutions of the Prediction </b>
+      <br/>
+      <img style="border: 0px solid; width: 800px" alt="" src="forecast_predict_evolution.svg"/>
+      <br/>
+      <b> World Time Evolutions of the Prediction </b>
+      <br/>
+      <img style="border: 0px solid; width: 800px" alt="" src="forecast_predict_world_evolution.svg"/>
+      <br/>
+      <b> Italian Forecasts Evolutions </b>
+      <br/>
+      <img style="border: 0px solid; width: 800px" alt="" src="italyGIF.gif"/>
+      <br/>
+
+      <b> Forecasts from the past 10 days </b> 
+       
+
+      <br/><br/><br/>
+      <font size="3" > P. Davini (CNR-ISAC), October 2020  </font>
+    </div>
+
+  </body>
+
+</html>
+
+

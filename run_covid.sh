@@ -1,10 +1,13 @@
 # declare a few folders
+wave=$1
+
 DIR="/home/paolo/covid"
 ITADIR=$DIR/COVID-ITALY
 WORDIR=$DIR/COVID-WORLD
 ENGDIR=$DIR/COVID-UK
-WWWDIR="/var/www/html/diss/paolo/covid-19"
-FIGDIR="/work/users/paolo/figures/COVID-19"
+WWWDIR="/var/www/html/diss/paolo/covid-19/wave$wave"
+mkdir -p $WWWDIR
+FIGDIR="/work/users/paolo/figures/COVID-19/$wave"
 
 # fetch of italian and world data
 for dir in $ITADIR $WORDIR $ENGDIR ; do
@@ -26,7 +29,7 @@ cp $FIGDIR/$filename $WWWDIR
 ln -sf $WWWDIR/$filename $WWWDIR/$today
 
 # prepare html
-cp $DIR/Cointreau/index.tmpl $WWWDIR/index.html
+cp $DIR/Cointreau/index_wave$wave.tmpl $WWWDIR/index.html
 sed -i "s/<DATE>/$(date)/g" "$WWWDIR/index.html"
 
 for i in $(seq -10 -1);
@@ -35,7 +38,7 @@ do
 	if [ -f $FIGDIR/covid-status-$ll.svg ] ; then
 		echo $ll
 		cp $FIGDIR/covid-status-$ll.svg $WWWDIR
-		insert="<br/> <font size="3" > Forecasts at <a href=http://wilma.to.isac.cnr.it/diss/paolo/covid-19/covid-status-$ll.svg > $ll </a></i> </font>"
+		insert="<br/> <font size="3" > Forecasts at <a href=http://wilma.to.isac.cnr.it/diss/paolo/covid-19/wave$wave/covid-status-$ll.svg > $ll </a></i> </font>"
 		sed "/past 10 days/a ${insert}" -i "$WWWDIR/index.html"
 	fi
 done;
@@ -47,4 +50,4 @@ convert -delay 100 -loop 0 $FIGDIR/forecast/italy/*.pdf $WWWDIR/italyGIF.gif
 cp $FIGDIR/forecast*evolution.svg $WWWDIR
 
 # england prediction
-cp $FIGDIR/forecast/england/*.pdf $WWWDIR/england
+#cp $FIGDIR/forecast/england/*.pdf $WWWDIR/england
